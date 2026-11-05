@@ -1,18 +1,23 @@
 {
   "name": "pg-listen",
-  "version": "1.7.0",
+  "version": "2.0.0-ganderworks.1",
   "license": "MIT",
-  "description": "PostgreSQL LISTEN &  NOTIFY that finally works.",
+  "description": "PostgreSQL LISTEN & NOTIFY that finally works. Ganderworks fork: keeps reconnecting, catches half-open connections.",
   "author": "Andy Wermke (https://github.com/andywer)",
-  "repository": "github:andywer/pg-listen",
+  "contributors": [
+    "Ganderworks"
+  ],
+  "repository": "github:Ganderworks/pg-listen",
   "main": "./index.js",
-  "typings": "./dist/index.d.ts",
+  "types": "./dist/index.d.ts",
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "build": "tsc",
-    "test": "ava test/*.test.ts",
-    "test:database": "docker run -e POSTGRES_DB=postgres -e POSTGRES_PASSWORD=postgres -p 5432:5432 --rm postgres:10.4-alpine",
-    "posttest": "tslint --project .",
-    "prepare": "npm run build"
+    "typecheck": "tsc --noEmit -p tsconfig.test.json",
+    "test": "vitest run",
+    "test:database": "docker run -e POSTGRES_DB=postgres -e POSTGRES_PASSWORD=postgres -p 5432:5432 --rm postgres:16-alpine"
   },
   "keywords": [
     "postgres",
@@ -22,49 +27,21 @@
     "events"
   ],
   "peerDependencies": {
-    "pg": "7.x || 8.x"
+    "pg": "8.x"
   },
   "dependencies": {
-    "debug": "^4.1.1",
-    "pg-format": "^1.0.4",
-    "typed-emitter": "^0.1.0"
+    "debug": "^4.4.3"
   },
   "devDependencies": {
-    "@types/debug": "^4.1.2",
-    "@types/node": "^10.14.1",
-    "@types/pg": "^7.4.13",
-    "@types/pg-format": "^1.0.0",
-    "ava": "^6.1.3",
-    "lint-staged": "^13.0.4",
-    "pg": "^8.0.3",
-    "prettier": "^1.16.4",
-    "ts-node": "^8.0.3",
-    "tslint": "^5.14.0",
-    "tslint-config-prettier": "^1.18.0",
-    "typescript": "^3.3.3333"
+    "@types/debug": "^4.1.12",
+    "@types/node": "^20.0.0",
+    "@types/pg": "^8.15.0",
+    "pg": "^8.20.0",
+    "typescript": "~5.9.2",
+    "vitest": "^4.1.12"
   },
   "files": [
     "dist/**",
     "index.js"
-  ],
-  "ava": {
-    "compileEnhancements": false,
-    "extensions": [
-      "ts"
-    ],
-    "require": [
-      "ts-node/register"
-    ],
-    "serial": true
-  },
-  "prettier": {
-    "semi": false,
-    "printWidth": 100
-  },
-  "lint-staged": {
-    "*": [
-      "prettier --write",
-      "git add"
-    ]
-  }
+  ]
 }
