@@ -14,7 +14,7 @@
 
 PostgreSQL can act as a message broker: Send notifications with arbitrary payloads from one database client to others.
 
-Works with node.js 8+ and plain JavaScript or TypeScript 3. Uses the Postgres [`NOTIFY`](https://www.postgresql.org/docs/10/static/sql-notify.html) statement and subscribes to notifications using [`LISTEN`](https://www.postgresql.org/docs/10/static/sql-listen.html).
+Works with node.js 18+, node-postgres 8, and plain JavaScript or TypeScript. Uses the Postgres [`NOTIFY`](https://www.postgresql.org/docs/10/static/sql-notify.html) statement and subscribes to notifications using [`LISTEN`](https://www.postgresql.org/docs/10/static/sql-listen.html).
 
 ### Features
 
@@ -30,6 +30,25 @@ Works with node.js 8+ and plain JavaScript or TypeScript 3. Uses the Postgres [`
 
 ---
 
+
+## This fork (Ganderworks)
+
+A maintained fork of [andywer/pg-listen](https://github.com/andywer/pg-listen), same API, fixing the ways a long-lived listener dies quietly in production:
+
+- **It never stops reconnecting** by default. Upstream gave up after 3s (`retryTimeout`), leaving the subscriber dead after any longer outage. Now `retryTimeout` defaults to 0 (never), and retries back off from 500ms, doubling, to 10s.
+- **Half-open connections are caught.** The paranoid check's query now has a timeout (`paranoidTimeout`, default the interval or 10s, whichever is less); before, a silent connection hung the check forever and nothing ever noticed.
+- **Connecting can't stall.** `connectionTimeoutMillis` defaults to 10s, and retired connections have their socket destroyed rather than waiting on a goodbye from a peer that's gone.
+- **The first `connect()` retries** like a reconnect does, instead of throwing on the first failure.
+- **No crash from a client it has let go of** erroring later, and no leaked client per failed attempt.
+- **`"connected"` means listening** on every channel, including ones added while reconnecting, so it's the moment to catch up on what was sent while disconnected. A connection lost during that setup is replaced, not kept.
+- **`close()` is final:** it stops a reconnect in flight (even a stalled one) and resolves once nothing is left running.
+- **Nothing arrives for a channel after `unlisten()`**, even a notification already on the wire.
+- **One query at a time** on its connection, ready for node-postgres 9 (which drops its own queue).
+- Dependencies: `debug` only (`pg-format` and `typed-emitter` are gone). `dist/` is committed, so installing from git needs no build.
+
+Install it pinned to a commit: `npm install github:Ganderworks/pg-listen#<sha>`.
+
+Tests run against a real Postgres, with a TCP proxy that refuses, stalls, pauses or blackholes connections: `npm run test:database`, then `npm test` (or set `DATABASE_URL`).
 
 ## Installation
 
@@ -88,13 +107,11 @@ For details see [dist/index.d.ts](./dist/index.d.ts).
 
 #### `instance.events.on("connected", listener: () => void)`
 
-The `connected` event is emitted once after initially establishing the connection and later once after every successful reconnect. Reconnects happen automatically when `pg-listen` detects that the connection closed or became unresponsive.
+The `connected` event is emitted once after initially establishing the connection and later once after every successful reconnect. Reconnects happen automatically when `pg-listen` detects that the connection closed or became unresponsive. By then it is listening on every subscribed channel. Postgres doesn't keep notifications for a listener that wasn't there, so after a reconnect this is when to catch up on anything sent in between.
 
 #### `instance.events.on("error", listener: (error: Error) => void)`
 
-An `error` event is emitted for fatal errors that affect the notification subscription. A standard way of handling those kinds of errors would be to `console.error()`-log the error and terminate the process with a non-zero exit code.
-
-This `error` event is usually emitted after multiple attempts to reconnect have failed.
+An `error` event is emitted for a notification payload that didn't parse (listening carries on), and when reconnecting gives up, which with the default options it never does: only a `retryLimit` or `retryTimeout` you set ends it. An `error` nobody listens to throws, like any EventEmitter's, so always listen.
 
 #### `instance.events.on("notification", listener: ({ channel, payload }) => void)`
 

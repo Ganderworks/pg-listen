@@ -1,5 +1,4 @@
-dist/*
-!dist/*.d.ts
+# dist/ is committed: installs from git get built code without a build step.
 node_modules/
 .DS_Store
 Thumbs.db
